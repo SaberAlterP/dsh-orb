@@ -8,8 +8,14 @@ use serde::Serialize;
 pub const BALL: f64 = 72.0;
 pub const PANEL_W: f64 = 320.0;
 pub const PANEL_H: f64 = 420.0;
-pub const PANEL_WINDOW_W: f64 = PANEL_W + 24.0;
-pub const PANEL_WINDOW_H: f64 = PANEL_H + 24.0;
+/// Panel content size (Orb's FLOATING_PANEL_SIZE is the default; dsh-orb lets the user resize it).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PanelSize {
+    pub width: f64,
+    pub height: f64,
+}
+pub const DEFAULT_PANEL: PanelSize = PanelSize { width: PANEL_W, height: PANEL_H };
+pub const MIN_PANEL: PanelSize = PanelSize { width: 280.0, height: 300.0 };
 pub const BALL_DEFAULT_BELOW_CENTER: f64 = 0.08;
 /// `Math.round(72 / 5)` and `Math.round(72 / 3)` in Orb.
 pub const DOCK_OVERLAP: f64 = 14.0;
@@ -175,10 +181,10 @@ pub fn lerp_rect(start: Rect, end: Rect, t: f64) -> Rect {
     }
 }
 
-pub fn expand_direction(ball: Point, work_area: Rect) -> Direction {
+pub fn expand_direction(ball: Point, work_area: Rect, panel: PanelSize) -> Direction {
     Direction {
         horizontal: if ball.x + BALL / 2.0 - work_area.x > work_area.width / 2.0 { Horizontal::Left } else { Horizontal::Right },
-        vertical: if ball.y - work_area.y < PANEL_H - BALL { Vertical::Down } else { Vertical::Up },
+        vertical: if ball.y - work_area.y < panel.height - BALL { Vertical::Down } else { Vertical::Up },
     }
 }
 
@@ -202,18 +208,26 @@ pub fn default_ball_origin(work_area: Rect) -> Point {
     clamped_ball_origin(Point { x: round(x), y: round(y) }, work_area)
 }
 
-pub fn overlay_bounds_from_ball(ball: Point, direction: Direction) -> Rect {
+pub fn overlay_bounds_from_ball(ball: Point, direction: Direction, panel: PanelSize) -> Rect {
     Rect {
-        x: if direction.horizontal == Horizontal::Left { ball.x - (PANEL_W - BALL) - 12.0 } else { ball.x - 12.0 },
-        y: if direction.vertical == Vertical::Up { ball.y - (PANEL_H - BALL) - 12.0 } else { ball.y - 12.0 },
-        width: PANEL_WINDOW_W,
-        height: PANEL_WINDOW_H,
+        x: if direction.horizontal == Horizontal::Left { ball.x - (panel.width - BALL) - 12.0 } else { ball.x - 12.0 },
+        y: if direction.vertical == Vertical::Up { ball.y - (panel.height - BALL) - 12.0 } else { ball.y - 12.0 },
+        width: panel.width + 24.0,
+        height: panel.height + 24.0,
     }
 }
 
-pub fn expanded_overlay_bounds(ball: Point, work_area: Rect) -> (Rect, Direction) {
-    let direction = expand_direction(ball, work_area);
-    let unclamped = overlay_bounds_from_ball(ball, direction);
+/// Clamp a requested panel size to the minimum and to the work area (Orb's 12px window margin on each side).
+pub fn clamp_panel(size: PanelSize, work_area: Rect) -> PanelSize {
+    PanelSize {
+        width: round(clamp(size.width, MIN_PANEL.width, work_area.width - 24.0)),
+        height: round(clamp(size.height, MIN_PANEL.height, work_area.height - 24.0)),
+    }
+}
+
+pub fn expanded_overlay_bounds(ball: Point, work_area: Rect, panel: PanelSize) -> (Rect, Direction) {
+    let direction = expand_direction(ball, work_area, panel);
+    let unclamped = overlay_bounds_from_ball(ball, direction, panel);
     (
         Rect {
             x: clamp_window_origin(unclamped.x, work_area.x, work_area.width, unclamped.width),
@@ -243,7 +257,7 @@ mod tests {
 
     #[test]
     fn expands_away_from_the_right_edge() {
-        let (rect, dir) = expanded_overlay_bounds(Point { x: 1848.0, y: 563.0 }, WORK);
+        let (rect, dir) = expanded_overlay_bounds(Point { x: 1848.0, y: 563.0 }, WORK, DEFAULT_PANEL);
         assert_eq!(dir, Direction { horizontal: Horizontal::Left, vertical: Vertical::Up });
         assert_eq!(rect, Rect { x: 1588.0, y: 203.0, width: 344.0, height: 444.0 });
     }

@@ -87,7 +87,7 @@
 			});
 		}
 
-		const inject = ["slots", "sessions"];
+		const inject = ["slots", "sessions", "uiWorkspace"];
 		function apply(ctx) {
 			if (!overlayClientSurface()) return;
 			shellLog("compact chat active; search=" + INITIAL_SEARCH);
@@ -106,6 +106,9 @@
 						const next = ctx.sessions.retain(overlaySessionId(id), { source: "mainView" });
 						held?.release();
 						held = next;
+						// Harness 0.2 shows the workspace's current session in `main`; switch it to the floating session.
+						ctx.uiWorkspace.openSession(overlaySessionId(id));
+						shellLog("open session " + id);
 						pending = void 0;
 					} catch (error) {
 						if (!(error instanceof Error) || !/unknown session/.test(error.message)) throw error;

@@ -30,6 +30,8 @@ enum UserEvent {
     Host(Value),
     Ipc(String),
     PageLoaded(String),
+    /// Debug only (DSH_ORB_DEBUG_NOHIDE): run %LOCALAPPDATA%dsh-orbeval.js in the floating page.
+    Eval(String),
     HostClosed,
 }
 
@@ -88,6 +90,8 @@ struct Floating {
     click_through: bool,
     session_running: bool,
     text_editing: bool,
+    panel: PanelSize,
+    panel_file: Option<std::path::PathBuf>,
 }
 
 impl Floating {
@@ -171,7 +175,7 @@ impl Floating {
         if is_collapsed(bounds) {
             return Point { x: bounds.x + 12.0, y: bounds.y + 12.0 };
         }
-        ball_origin_from_window(bounds, self.direction.unwrap_or_else(|| expand_direction(Point { x: bounds.x, y: bounds.y }, work_area)))
+        ball_origin_from_window(bounds, self.direction.unwrap_or_else(|| expand_direction(Point { x: bounds.x, y: bounds.y }, work_area, self.panel)))
     }
     fn apply_docked_tab(&mut self, side: Side, ball_y: f64, bounds: Rect) -> Docked {
         let y = clamp_ball_y(ball_y, bounds);
@@ -188,13 +192,13 @@ impl Floating {
         if expanded {
             let origin = self.current_ball_origin(work_area);
             self.dock = None;
-            let (next, direction) = expanded_overlay_bounds(origin, work_area);
+            let (next, direction) = expanded_overlay_bounds(origin, work_area, clamp_panel(self.panel, work_area));
             self.direction = Some(direction);
             self.cancel_anim();
             self.set_bounds(next);
             return ExpandState { expanded: true, horizontal: direction.horizontal, vertical: direction.vertical, docked: None };
         }
-        let direction = self.direction.unwrap_or_else(|| expand_direction(Point { x: bounds.x, y: bounds.y }, work_area));
+        let direction = self.direction.unwrap_or_else(|| expand_direction(Point { x: bounds.x, y: bounds.y }, work_area, self.panel));
         if let Some(d) = self.dock {
             self.apply_docked_tab(d.side, d.y, display.bounds);
             return ExpandState { expanded: false, horizontal: direction.horizontal, vertical: direction.vertical, docked: Some(d.side) };
@@ -208,8 +212,8 @@ impl Floating {
     fn move_ball(&mut self, x: f64, y: f64, can_dock: bool) -> Docked {
         let origin = Point { x: round(x), y: round(y) };
         if !is_collapsed(self.bounds()) && self.dock.is_none() {
-            let direction = self.direction.unwrap_or_else(|| expand_direction(origin, self.display_near(origin).work_area));
-            self.set_bounds(overlay_bounds_from_ball(origin, direction));
+            let direction = self.direction.unwrap_or_else(|| expand_direction(origin, self.display_near(origin).work_area, self.panel));
+            self.set_bounds(overlay_bounds_from_ball(origin, direction, self.panel));
             return Docked { docked: None };
         }
         if !can_dock {
@@ -266,6 +270,22 @@ impl Floating {
         self.animate(collapsed_window_bounds(end), 300.0, ease_out_cubic, AnimThen::Reply(reply));
         None
     }
+    /// dsh-orb addition: resize the expanded panel, keeping the ball where it is; remembered per profile.
+    fn resize_panel(&mut self, width: f64, height: f64) -> PanelSize {
+        let bounds = self.bounds();
+        let work_area = self.display_near(window_center(bounds)).work_area;
+        self.panel = clamp_panel(PanelSize { width, height }, work_area);
+        if !is_collapsed(bounds) && self.dock.is_none() {
+            let direction = self.direction.unwrap_or_else(|| expand_direction(Point { x: bounds.x, y: bounds.y }, work_area, self.panel));
+            let ball = ball_origin_from_window(bounds, direction);
+            self.cancel_anim();
+            self.set_bounds(overlay_bounds_from_ball(ball, direction, self.panel));
+        }
+        if let Some(file) = &self.panel_file {
+            let _ = std::fs::write(file, json!({ "width": self.panel.width, "height": self.panel.height }).to_string());
+        }
+        self.panel
+    }
     /// `applyFloatingOverlayGuard` + `syncOverlayGuard` (Windows branch).
     fn overlay_guard(&mut self, mode: &str, begin: bool) {
         let counter = if mode == "input" { &mut self.input } else { &mut self.capture };
@@ -313,6 +333,20 @@ fn main() {
     let event_loop = EventLoopBuilder::<UserEvent>::with_user_event().build();
     let proxy = event_loop.create_proxy();
     spawn_stdin_reader(proxy.clone());
+    if std::env::var("DSH_ORB_DEBUG_NOHIDE").is_ok() {
+        let eval_proxy = proxy.clone();
+        std::thread::spawn(move || {
+            let Ok(base) = std::env::var("LOCALAPPDATA") else { return };
+            let path = std::path::PathBuf::from(base).join("dsh-orb").join("eval.js");
+            loop {
+                std::thread::sleep(Duration::from_millis(700));
+                if let Ok(code) = std::fs::read_to_string(&path) {
+                    let _ = std::fs::remove_file(&path);
+                    let _ = eval_proxy.send_event(UserEvent::Eval(code));
+                }
+            }
+        });
+    }
 
     // The plugin sends `hello` first; wait for it before creating windows.
     let hello = loop {
@@ -374,7 +408,14 @@ fn main() {
         click_through: false,
         session_running: false,
         text_editing: false,
+        panel: DEFAULT_PANEL,
+        panel_file: hello["profile"].as_str().map(|p| std::path::PathBuf::from(p).join("orb-panel-size.json")),
     };
+    if let Some(saved) = floating.panel_file.as_ref().and_then(|f| std::fs::read_to_string(f).ok()).and_then(|t| serde_json::from_str::<Value>(&t).ok()) {
+        if let (Some(w), Some(h)) = (saved["width"].as_f64(), saved["height"].as_f64()) {
+            floating.panel = PanelSize { width: w.max(MIN_PANEL.width), height: h.max(MIN_PANEL.height) };
+        }
+    }
     {
         let s = floating.scale();
         let primary = win::monitors().into_iter().find(|(b, _)| b.x == 0.0 && b.y == 0.0).map(|(_, w)| w);
@@ -402,6 +443,10 @@ fn main() {
                     // The one-time login URL set the Host cookie (303 -> index); now open Orb's floating document.
                     let _ = floating.webview.load_url(&page_url);
                 }
+            }
+            Event::UserEvent(UserEvent::Eval(code)) => {
+                let wrapped = format!("(async () => {{ try {{ const r = await (async () => {{ {code} }})(); console.warn('eval-result', JSON.stringify(r)) }} catch (e) {{ console.warn('eval-error', e && (e.stack || e.message) || e) }} }})()");
+                let _ = floating.webview.evaluate_script(&wrapped);
             }
             Event::UserEvent(UserEvent::Ipc(body)) => handle_ipc(&mut floating, &body, control_flow),
             Event::UserEvent(UserEvent::Host(msg)) => match msg["type"].as_str().unwrap_or_default() {
@@ -476,6 +521,14 @@ fn handle_ipc(f: &mut Floating, body: &str, control_flow: &mut ControlFlow) {
             let r = f.set_expanded(flag(0, false));
             f.reply(id, serde_json::to_value(r).unwrap());
         }
+        "floatingResize" => match (num(0), num(1)) {
+            (Some(w), Some(h)) => {
+                let p = f.resize_panel(w, h);
+                f.reply(id, json!({ "width": p.width, "height": p.height }));
+            }
+            _ => f.reply_error(id, "orb-shell: invalid panel size"),
+        },
+        "floatingPanelSize" => f.reply(id, json!({ "width": f.panel.width, "height": f.panel.height })),
         "floatingFocusMain" => {
             win::open_url("dsh://open");
             f.reply(id, Value::Null);

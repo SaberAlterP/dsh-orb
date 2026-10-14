@@ -137,6 +137,58 @@
 		void showContextMenu(event)
 	})
 
+	// ── panel resize (dsh-orb addition; Orb's panel was a fixed 320x420) ──
+	// Drag the panel's outer edges away from the ball (the panel grows away from it), like a window border.
+	// Handles live on <body> so they are positioned against the window; CSP is style-src 'self', so CSSOM only.
+	function installResizeHandles() {
+		if (document.querySelector('[data-orb-resize]') !== null) return
+		const make = (kind) => {
+			const el = document.createElement('div')
+			el.dataset.orbResize = kind
+			Object.assign(el.style, { position: 'fixed', zIndex: '2147483647', touchAction: 'none', background: 'transparent' })
+			document.body.append(el)
+			return el
+		}
+		const handles = { x: make('x'), y: make('y'), xy: make('xy') }
+		const layout = () => {
+			const left = document.body.classList.contains('expand-left')
+			const up = document.body.classList.contains('expand-up')
+			const show = document.body.classList.contains('expanded') && document.querySelector('#panel')?.hidden !== true
+			// Window = 12px margin + panel card; the strips straddle the card's border (6px .. 18px from the edge).
+			Object.assign(handles.x.style, { display: show ? '' : 'none', width: '12px', top: '48px', bottom: '48px', left: left ? '6px' : '', right: left ? '' : '6px', cursor: 'ew-resize' })
+			Object.assign(handles.y.style, { display: show ? '' : 'none', height: '12px', left: '48px', right: '48px', top: up ? '6px' : '', bottom: up ? '' : '6px', cursor: 'ns-resize' })
+			Object.assign(handles.xy.style, { display: show ? '' : 'none', width: '22px', height: '22px', left: left ? '4px' : '', right: left ? '' : '4px', top: up ? '4px' : '', bottom: up ? '' : '4px', cursor: left === up ? 'nwse-resize' : 'nesw-resize' })
+			return { left, up }
+		}
+		new MutationObserver(layout).observe(document.body, { attributes: true, attributeFilter: ['class'], subtree: false })
+		const panel = document.querySelector('#panel')
+		if (panel !== null) new MutationObserver(layout).observe(panel, { attributes: true, attributeFilter: ['hidden'] })
+		layout()
+		let drag
+		for (const [kind, el] of Object.entries(handles)) {
+			el.addEventListener('pointerdown', async (event) => {
+				event.preventDefault()
+				event.stopPropagation()
+				el.setPointerCapture(event.pointerId)
+				const size = await invoke('floatingPanelSize')
+				drag = { ...layout(), kind, x: event.screenX, y: event.screenY, width: size.width, height: size.height, pending: false }
+			})
+			el.addEventListener('pointermove', (event) => {
+				if (drag === undefined || drag.pending) return
+				const dx = event.screenX - drag.x, dy = event.screenY - drag.y
+				const width = drag.kind === 'y' ? drag.width : drag.width + (drag.left ? -dx : dx)
+				const height = drag.kind === 'x' ? drag.height : drag.height + (drag.up ? -dy : dy)
+				drag.pending = true
+				void invoke('floatingResize', width, height).finally(() => { if (drag !== undefined) drag.pending = false })
+			})
+			const end = () => { drag = undefined }
+			el.addEventListener('pointerup', end)
+			el.addEventListener('pointercancel', end)
+		}
+	}
+	if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', installResizeHandles)
+	else installResizeHandles()
+
 	window.dshDesktop = {
 		protocolVersion: 1,
 		locale: () => host('locale'),
