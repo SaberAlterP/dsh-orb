@@ -1,8 +1,8 @@
 # dsh-orb design
 
 Goal: DeepSeek Orb 0.1.7's desktop agent on DeepSeek Harness 0.2 **without patching the kernel**, behaving the
-same for the user: the floating ball, its compact chat, Computer Use, the background `code_agent`, the selection
-toolbar, the observation frame, and the Orb settings.
+same for the user: the floating ball, its compact chat, Computer Use, the background `code_agent`, the observation frame, and
+the Orb settings. (Orb's selection toolbar is intentionally not carried over.)
 
 ## What Orb was made of
 
@@ -12,7 +12,7 @@ toolbar, the observation frame, and the Orb settings.
 | Computer Use tools, `code_agent` / `code_agent_status` / `code_agent_stop` | `@deepseek-ai/dsh-experimental-tool-computer-use` | `lib/computer-use/` (Orb code + local auto-archive fix) |
 | Overlay guard, Orb permission, coordinate mode, code_agent model | `@deepseek-ai/dsh-desktop-host` (Orb build) | `lib/host/` |
 | Preferences pushed by the Electron shell | Orb `lib/main.js` IPC | `lib/host/orb-prefs.js` reads the same profile files |
-| Floating ball, compact chat panel, selection toolbar, observation frame | Orb Electron main + `renderer/` | `orb-shell` companion (Rust + WebView2) + Orb's renderer files |
+| Floating ball, compact chat panel, observation frame | Orb Electron main + `renderer/` | `orb-shell` companion (Rust + WebView2) + Orb's renderer files |
 | Compact Chat transcript (`?surface=overlay`) | `@deepseek-ai/dsh-client-ui-overlay-chat` + kernel overlay hooks | plugin client UI (overlay helpers inlined) |
 | Orb settings page | `@deepseek-ai/dsh-client-ui-settings-orb` | plugin client UI |
 
@@ -30,20 +30,19 @@ Harness Host process ── dsh-orb host plugin ──spawn──> orb-shell.exe
 
 - Renderer documents are served by the plugin from the Host web server, so `/api/*`, `/.dsh/remote-stream` and the
   `?surface=overlay` iframe are same-origin with the cookie the login URL minted. No CORS, no extra auth.
-- `window.dshDesktop.floating.*` / `selection.*` (Orb `lib/preload.cjs`) is recreated by an injected shim over
+- `window.dshDesktop.floating.*` (Orb `lib/preload.cjs`) is recreated by an injected shim over
   `chrome.webview.postMessage`; window operations go to Rust, preference reads/writes to the plugin routes.
-- Rust owns only what needs the OS: transparent always-on-top windows, drag/dock/expand geometry (ported from Orb's
-  `moveFloatingBall`/`clampFloatingWindow`/dock helpers), `WDA_EXCLUDEFROMCAPTURE`, click-through during GUI input,
-  low-level mouse/keyboard hooks and selection reading for the toolbar, the observation frame window.
+- Rust owns only what needs the OS: transparent always-on-top windows, drag/dock/expand/resize geometry (ported from
+  Orb's `moveFloatingBall`/`clampFloatingWindow`/dock helpers), the native context menu, `WDA_EXCLUDEFROMCAPTURE`,
+  click-through during GUI input, and the observation frame window.
 - Focusing the main window uses `dsh://open` (Harness handles it with `focusPrimaryWindow()`).
 
-## Order of work
+## Status
 
-1. Host side: preset, tools, code_agent, prefs. **Done, verified on 0.2.0-rc.2.**
-2. `orb-shell` floating ball + compact chat.
-3. Selection toolbar, observation frame, overlay guard wiring.
-4. Orb settings page.
-5. README, CI release of `orb-shell.exe`, GitHub.
+1. Host side: preset, tools, code_agent, prefs — verified on 0.2.0-rc.2.
+2. `orb-shell` floating ball, compact chat, history / new conversation, resizable panel, context menu — verified.
+3. Orb settings page — verified.
+4. Session log compatibility: no unknown events written; `scripts/repair-session-logs.mjs` for Orb-era logs.
 
 ## Changes to Orb's renderer files
 

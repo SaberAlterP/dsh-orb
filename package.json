@@ -29,11 +29,11 @@
     "lib/**",
     "presets/**",
     "renderer/**",
-    "orb-shell/orb-shell.exe",
     "cordis.patch.yml",
     "LICENSE",
     "LICENSE.deepseek-computer-use",
-    "README.md"
+    "README.md",
+    "orb-shell/orb-shell.exe"
   ],
   "keywords": [
     "dsh",
@@ -73,5 +73,9 @@
         "@deepseek-ai/dsh-client-ui-slots"
       ]
     }
-  }
+  },
+  "author": "SaberAlterP",
+  "contributors": [
+    "DeepSeek (original DeepSeek Orb 0.1.7 code, MIT)"
+  ]
 }

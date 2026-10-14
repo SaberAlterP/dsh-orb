@@ -1,5 +1,5 @@
 // orb-bridge.js — recreates Orb 0.1.7's `window.dshDesktop` preload bridge (lib/preload.cjs) inside WebView2.
-// Same shape and semantics as the Electron preload: window/focus/selection operations go to the native companion
+// Same shape and semantics as the Electron preload (minus the selection toolbar, which dsh-orb drops): window and focus operations go to the native companion
 // over `chrome.webview` messages; preference operations go to the dsh-orb Host routes (/.dsh/orb/api/<op>).
 ;(() => {
 	// orb-shell (wry) exposes window.ipc.postMessage(string) and calls window.__orbBridgeReceive(message) back.
@@ -99,8 +99,8 @@
 	async function showContextMenu(event) {
 		const { messages } = await host('locale')
 		const actions = { list: [], add(fn) { this.list.push(fn); return this.list.length } }
-		const [catalog, overlay, background, selectionEnabled, millifraction] = await Promise.all([
-			modelCatalog().catch(() => undefined), host('overlayModelGet'), host('backgroundModelGet'), host('selectionEnabledGet'), host('millifractionGet'),
+		const [catalog, overlay, background, millifraction] = await Promise.all([
+			modelCatalog().catch(() => undefined), host('overlayModelGet'), host('backgroundModelGet'), host('millifractionGet'),
 		])
 		const labels = { empty: messages.floatingNoModels, defaultEffort: messages.floatingEffortDefault }
 		const items = [
@@ -109,7 +109,6 @@
 			{ label: messages.floatingAgentSettings, submenu: agentModelItems(catalog, overlay, setOverlayModel, labels, actions) },
 			{ label: messages.floatingBackgroundAgentSettings, submenu: agentModelItems(catalog, background, (next) => host('backgroundModelSet', next), labels, actions) },
 			{ separator: true },
-			{ label: selectionEnabled ? messages.selectionToolbarDisable : messages.selectionToolbarEnable, id: actions.add(() => host('selectionEnabledSet', !selectionEnabled).then(() => invoke('selectionReload').catch(() => {}))) },
 			{ label: millifraction ? messages.millifractionDisable : messages.millifractionEnable, id: actions.add(() => toggleMillifraction(!millifraction, messages)) },
 			{ separator: true },
 			{ label: messages.floatingQuit, id: actions.add(() => invoke('floatingQuit')) },
@@ -224,15 +223,6 @@
 			openTcc: async () => ({ applicable: false, appName: 'DeepSeek Harness', screen: 'granted', accessibility: 'granted' }),
 			relaunch: async () => {},
 			onTccStatus: (listener) => on('tcc', listener),
-		},
-		selection: {
-			search: () => invoke('selectionSearch'),
-			translate: () => invoke('selectionTranslate'),
-			sendToAgent: () => invoke('selectionAttach'),
-			setLanguage: (language) => invoke('selectionSetLanguage', language),
-			interact: () => invoke('selectionInteract'),
-			setContentSize: (size) => invoke('selectionSetContentSize', size),
-			onState: (listener) => on('selection-state', listener),
 		},
 	}
 })()

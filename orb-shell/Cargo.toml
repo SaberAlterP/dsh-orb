@@ -2,7 +2,7 @@
 name = "orb-shell"
 version = "0.1.0"
 edition = "2021"
-description = "Native companion for dsh-orb: Orb's floating ball, selection toolbar and observation frame on DeepSeek Harness 0.2"
+description = "Native companion for dsh-orb: Orb's floating ball and observation frame on DeepSeek Harness 0.2"
 license = "MIT"
 publish = false
 
