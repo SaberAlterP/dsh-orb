@@ -44,3 +44,13 @@ Harness Host process ── dsh-orb host plugin ──spawn──> orb-shell.exe
 3. Selection toolbar, observation frame, overlay guard wiring.
 4. Orb settings page.
 5. README, CI release of `orb-shell.exe`, GitHub.
+
+## Changes to Orb's renderer files
+
+`renderer/` keeps Orb 0.1.7's files (with the local floating-ball patches ②⑤⑥⑨⑩⑪⑫) byte-identical, except:
+
+- `floating.js` `renderHistory`: blank (never used) conversations are hidden from the history list, except the
+  one currently open.
+
+Everything else Harness 0.2 needs is added around them: `orb-bridge.js` (preload replacement, context menu,
+panel resize handles) and serve-time origin rewriting in `lib/host/shell.js`.

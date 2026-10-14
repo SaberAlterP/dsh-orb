@@ -947,7 +947,8 @@ syncGif()
  }
 
 async function renderHistory(items) {
-const rows = orbComputerUseItems(items, await orbCwd())
+// dsh-orb: hide never-used (blank) conversations, except the one currently open.
+const rows = orbComputerUseItems(items, await orbCwd()).filter(item => item.blank !== true || item.sessionId === sessionId)
 historyList.replaceChildren()
 if (rows.length === 0) {
 const empty = document.createElement('p')
