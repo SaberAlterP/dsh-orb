@@ -77,5 +77,13 @@
   "author": "SaberAlterP",
   "contributors": [
     "DeepSeek (original DeepSeek Orb 0.1.7 code, MIT)"
-  ]
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SaberAlterP/dsh-orb.git"
+  },
+  "homepage": "https://github.com/SaberAlterP/dsh-orb#readme",
+  "bugs": {
+    "url": "https://github.com/SaberAlterP/dsh-orb/issues"
+  }
 }
