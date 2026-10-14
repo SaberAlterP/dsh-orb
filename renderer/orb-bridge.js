@@ -132,7 +132,7 @@
 		await host('millifractionSet', enabled)
 		for (const listener of listeners.get('create-session') ?? []) listener()
 	}
-	document.addEventListener('contextmenu', (event) => {
+	if (location.pathname.endsWith('/floating.html')) document.addEventListener('contextmenu', (event) => {
 		event.preventDefault()
 		void showContextMenu(event)
 	})

@@ -11,6 +11,8 @@
 #![windows_subsystem = "windows"]
 
 mod geometry;
+mod selection;
+mod toolbar;
 mod win;
 
 use geometry::*;
@@ -28,11 +30,35 @@ use wry::{PageLoadEvent, WebContext, WebView, WebViewBuilder};
 #[derive(Debug)]
 enum UserEvent {
     Host(Value),
-    Ipc(String),
+    Ipc(Source, String),
+    /// Global mouse/keyboard hook message (selection toolbar).
+    Hook(selection::HookEvent),
+    /// A UI Automation text selection read after a left-button release.
+    Selected(selection::Selection),
     PageLoaded(String),
     /// Debug only (DSH_ORB_DEBUG_NOHIDE): run %LOCALAPPDATA%dsh-orbeval.js in the floating page.
     Eval(String),
     HostClosed,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Source {
+    Floating,
+    Toolbar,
+}
+
+/// Push `{ type: 'event', channel, payload }` to a page's orb-bridge.
+pub fn bridge_emit(webview: &WebView, channel: &str, payload: Value) {
+    let msg = json!({ "type": "event", "channel": channel, "payload": payload });
+    let _ = webview.evaluate_script(&format!("window.__orbBridgeReceive && window.__orbBridgeReceive({msg})"));
+}
+
+fn bridge_reply(webview: &WebView, id: u64, value: Result<Value, String>) {
+    let msg = match value {
+        Ok(value) => json!({ "type": "reply", "id": id, "value": value }),
+        Err(error) => json!({ "type": "reply", "id": id, "error": error }),
+    };
+    let _ = webview.evaluate_script(&format!("window.__orbBridgeReceive && window.__orbBridgeReceive({msg})"));
 }
 
 /// Bridge from the renderer: window.ipc.postMessage(JSON) and window.__orbBridgeReceive(reply).
@@ -97,6 +123,10 @@ struct Floating {
 impl Floating {
     fn hwnd(&self) -> HWND {
         self.window.hwnd() as HWND
+    }
+    fn contains_physical(&self, x: f64, y: f64) -> bool {
+        let r = win::window_rect(self.hwnd());
+        x >= r.x && y >= r.y && x < r.x + r.width && y < r.y + r.height
     }
     fn scale(&self) -> f64 {
         self.window.scale_factor()
@@ -386,7 +416,7 @@ fn main() {
         .with_initialization_script_for_main_only(BRIDGE_PRELUDE, false)
         .with_initialization_script_for_main_only(if std::env::var("DSH_ORB_DEBUG_NOHIDE").is_ok() { "window.__DSH_ORB_AUTOHIDE__ = { dockAutoHide: false, autoCollapseMs: 3600000 };" } else { "" }, true)
         .with_ipc_handler(move |req| {
-            let _ = ipc_proxy.send_event(UserEvent::Ipc(req.body().clone()));
+            let _ = ipc_proxy.send_event(UserEvent::Ipc(Source::Floating, req.body().clone()));
         })
         .with_on_page_load_handler(move |event, url| {
             if matches!(event, PageLoadEvent::Finished) {
@@ -423,6 +453,41 @@ fn main() {
         floating.set_bounds(collapsed_window_bounds(default_ball_origin(work)));
     }
 
+    // Selection toolbar (Orb createSelectionToolbarWindow): hidden until a selection is read.
+    let toolbar_window = WindowBuilder::new()
+        .with_title("dsh-orb selection")
+        .with_decorations(false)
+        .with_transparent(true)
+        .with_always_on_top(true)
+        .with_resizable(false)
+        .with_visible(false)
+        .with_focused(false)
+        .with_skip_taskbar(true)
+        .with_inner_size(PhysicalSize::new(280u32, 46u32))
+        .build(&event_loop)
+        .expect("toolbar window");
+    let toolbar_ipc = proxy.clone();
+    let toolbar_webview = WebViewBuilder::new_with_web_context(&mut web_context)
+        .with_transparent(true)
+        .with_background_color((0, 0, 0, 0))
+        .with_initialization_script(BRIDGE_PRELUDE)
+        .with_ipc_handler(move |req| {
+            let _ = toolbar_ipc.send_event(UserEvent::Ipc(Source::Toolbar, req.body().clone()));
+        })
+        .with_url(format!("{base}/.dsh/orb/selection-toolbar.html"))
+        .build(&toolbar_window)
+        .expect("toolbar webview");
+    let mut toolbar = toolbar::Toolbar::new(toolbar_window, toolbar_webview, hello["profile"].as_str());
+    let hook_proxy = proxy.clone();
+    let install_hooks = move || {
+        let p = hook_proxy.clone();
+        selection::install(move |event| {
+            let _ = p.send_event(UserEvent::Hook(event));
+        })
+    };
+    toolbar.sync_hooks(&install_hooks);
+    let read_proxy = proxy.clone();
+
     let mut frame: Option<Frame> = None;
     let mut shown = false;
     let mut on_page = false;
@@ -448,7 +513,45 @@ fn main() {
                 let wrapped = format!("(async () => {{ try {{ const r = await (async () => {{ {code} }})(); console.warn('eval-result', JSON.stringify(r)) }} catch (e) {{ console.warn('eval-error', e && (e.stack || e.message) || e) }} }})()");
                 let _ = floating.webview.evaluate_script(&wrapped);
             }
-            Event::UserEvent(UserEvent::Ipc(body)) => handle_ipc(&mut floating, &body, control_flow),
+            Event::UserEvent(UserEvent::Ipc(source, body)) => {
+                let reload = handle_ipc(&mut floating, &mut toolbar, source, &body, control_flow);
+                if reload {
+                    toolbar.load_config();
+                    toolbar.sync_hooks(&install_hooks);
+                }
+            }
+            Event::UserEvent(UserEvent::Hook(event)) => match event {
+                selection::HookEvent::Dismiss | selection::HookEvent::OtherButton => toolbar.hide(),
+                selection::HookEvent::MouseDown { x, y } => {
+                    if !toolbar.contains(x, y) {
+                        toolbar.hide();
+                    }
+                }
+                selection::HookEvent::MouseUp { x, y } => {
+                    toolbar.anchor = (x, y);
+                    let paused = floating.session_running || floating.input > 0 || !toolbar.enabled;
+                    let own = toolbar.contains(x, y) || floating.contains_physical(x, y);
+                    if !paused && !own {
+                        let p = read_proxy.clone();
+                        std::thread::spawn(move || {
+                            if let Some(sel) = selection::read_selection() {
+                                let _ = p.send_event(UserEvent::Selected(sel));
+                            }
+                        });
+                    }
+                }
+            },
+            Event::UserEvent(UserEvent::Selected(sel)) => {
+                let excluded = sel.pid.map_or(false, selection::is_excluded);
+                if !excluded {
+                    if let Some(pid) = sel.pid {
+                        toolbar.last_front = Some(pid);
+                    }
+                    if !(floating.session_running || floating.input > 0 || !toolbar.enabled) {
+                        toolbar.on_selection(sel);
+                    }
+                }
+            }
             Event::UserEvent(UserEvent::Host(msg)) => match msg["type"].as_str().unwrap_or_default() {
                 "overlay-guard" => {
                     let id = msg["requestId"].clone();
@@ -456,6 +559,11 @@ fn main() {
                     let begin = msg["action"].as_str() == Some("begin");
                     floating.overlay_guard(mode, begin);
                     if mode == "input" && begin {
+                        // Orb: hide the toolbar, give focus back to the app the agent is driving.
+                        toolbar.hide();
+                        if let Some(pid) = toolbar.last_front {
+                            selection::activate_pid(pid);
+                        }
                         // Orb's overlayGuardInputApplyDelay: let click-through settle before the agent clicks.
                         std::thread::sleep(Duration::from_millis(80));
                     }
@@ -485,21 +593,74 @@ fn main() {
     });
 }
 
-fn handle_ipc(f: &mut Floating, body: &str, control_flow: &mut ControlFlow) {
-    let Ok(msg) = serde_json::from_str::<Value>(body) else { return };
+/// Returns true when the selection toolbar configuration changed and the hooks must be re-synced.
+fn handle_ipc(f: &mut Floating, tb: &mut toolbar::Toolbar, source: Source, body: &str, control_flow: &mut ControlFlow) -> bool {
+    let Ok(msg) = serde_json::from_str::<Value>(body) else { return false };
     if msg["type"].as_str() == Some("log") {
         log_line(&format!("[js {}] {} ({})", msg["level"].as_str().unwrap_or("?"), msg["text"].as_str().unwrap_or(""), msg["url"].as_str().unwrap_or("")));
-        return;
+        return false;
     }
     if msg["type"].as_str() != Some("invoke") {
-        return;
+        return false;
     }
-    log_line(&format!("invoke {} {}", msg["op"].as_str().unwrap_or("?"), msg["args"]));
+    let op = msg["op"].as_str().unwrap_or_default().to_string();
+    if !matches!(op.as_str(), "floatingRunning" | "floatingEditing" | "floatingMove") {
+        log_line(&format!("invoke {op} {}", msg["args"]));
+    }
+    if source == Source::Toolbar {
+        let id = msg["id"].as_u64().unwrap_or(0);
+        let args = msg["args"].as_array().cloned().unwrap_or_default();
+        let result: Result<Value, String> = match op.as_str() {
+            "selectionSearch" => {
+                if !tb.last_text.is_empty() {
+                    tb.hide();
+                    win::open_url(&toolbar::search_url(&tb.last_text));
+                }
+                Ok(Value::Null)
+            }
+            "selectionTranslate" => {
+                if !tb.last_text.is_empty() {
+                    f.window.set_visible(true);
+                    f.emit("selection-prompt", json!({ "text": toolbar::translate_prompt(&tb.last_text, &tb.language) }));
+                    tb.hide();
+                    tb.restore_front_app();
+                }
+                Ok(Value::Null)
+            }
+            "selectionAttach" => {
+                if !tb.last_text.is_empty() {
+                    f.window.set_visible(true);
+                    f.window.set_focus();
+                    f.emit("selection-attach", json!({ "text": tb.last_text }));
+                    tb.hide();
+                }
+                Ok(Value::Null)
+            }
+            "selectionSetLanguage" => match args.first().and_then(Value::as_str) {
+                Some(l @ ("zh" | "en")) => {
+                    tb.set_language(l);
+                    Ok(Value::Null)
+                }
+                _ => Err("dsh desktop: translate language must be zh or en".into()),
+            },
+            "selectionInteract" => Ok(Value::Null),
+            "selectionSetContentSize" => {
+                let size = args.first().cloned().unwrap_or(Value::Null);
+                match (size["width"].as_f64(), size["height"].as_f64()) {
+                    (Some(w), Some(h)) if w >= 1.0 && h >= 1.0 => Ok(json!({ "menuAbove": tb.set_content_size(w, h) })),
+                    _ => Err("dsh desktop: toolbar size requires positive finite width and height".into()),
+                }
+            }
+            other => Err(format!("orb-shell: unsupported toolbar operation {other}")),
+        };
+        bridge_reply(&tb.webview, id, result);
+        return false;
+    }
     let id = msg["id"].as_u64().unwrap_or(0);
     let args = msg["args"].as_array().cloned().unwrap_or_default();
     let num = |i: usize| args.get(i).and_then(Value::as_f64);
     let flag = |i: usize, default: bool| args.get(i).and_then(Value::as_bool).unwrap_or(default);
-    match msg["op"].as_str().unwrap_or_default() {
+    match op.as_str() {
         "floatingMove" => match (num(0), num(1)) {
             (Some(x), Some(y)) => {
                 let r = f.move_ball(x, y, flag(2, true));
@@ -539,13 +700,30 @@ fn handle_ipc(f: &mut Floating, body: &str, control_flow: &mut ControlFlow) {
         }
         "floatingRunning" => {
             f.session_running = flag(0, false);
+            if f.session_running {
+                tb.hide();
+            }
             f.reply(id, Value::Null);
         }
         "floatingEditing" => {
             f.text_editing = flag(0, false);
             f.reply(id, Value::Null);
         }
-        "floatingRestoreFront" => f.reply(id, Value::Null),
+        "floatingRestoreFront" => {
+            // Orb restoreFrontApp: only while a run is going and the user is not typing in the panel.
+            if f.session_running && !f.text_editing {
+                if let Some(pid) = tb.last_pid {
+                    if !selection::is_excluded(pid) {
+                        selection::activate_pid(pid);
+                    }
+                }
+            }
+            f.reply(id, Value::Null);
+        }
+        "selectionReload" => {
+            f.reply(id, Value::Null);
+            return true;
+        }
         "contextMenu" => {
             let items: Vec<win::MenuItem> = args.first().cloned().and_then(|v| serde_json::from_value(v).ok()).unwrap_or_default();
             let chosen = win::popup_menu(f.hwnd(), &items);
@@ -553,6 +731,7 @@ fn handle_ipc(f: &mut Floating, body: &str, control_flow: &mut ControlFlow) {
         }
         op => f.reply_error(id, &format!("orb-shell: unsupported operation {op}")),
     }
+    false
 }
 
 fn show_observation_frame(frame: &mut Option<Frame>, target: &tao::event_loop::EventLoopWindowTarget<UserEvent>, ctx: &mut WebContext, url: &str, bounds: &Value) {

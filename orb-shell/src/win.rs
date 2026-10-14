@@ -8,7 +8,7 @@ use windows_sys::Win32::Graphics::Gdi::{EnumDisplayMonitors, GetMonitorInfoW, HD
 use windows_sys::Win32::UI::Shell::ShellExecuteW;
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     AllowSetForegroundWindow, AppendMenuW, CreatePopupMenu, DestroyMenu, GetCursorPos, GetWindowRect, SetForegroundWindow, SetWindowDisplayAffinity,
-    SetWindowPos, TrackPopupMenu, HMENU, HWND_TOPMOST, MF_CHECKED, MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING,
+    SetWindowPos, TrackPopupMenu, GetWindowLongPtrW, SetWindowLongPtrW, ShowWindow, GWL_EXSTYLE, SW_HIDE, SW_SHOWNOACTIVATE, WS_EX_NOACTIVATE, HMENU, HWND_TOPMOST, MF_CHECKED, MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING,
     SWP_NOACTIVATE, SW_SHOWNORMAL, TPM_NONOTIFY, TPM_RETURNCMD, TPM_RIGHTBUTTON, WDA_EXCLUDEFROMCAPTURE, WDA_NONE,
 };
 
@@ -136,4 +136,26 @@ pub fn popup_menu(hwnd: HWND, items: &[MenuItem]) -> Option<u32> {
 #[allow(dead_code)]
 pub fn as_hwnd(raw: isize) -> HWND {
     raw as *mut c_void as HWND
+}
+
+/// Orb's toolbar was `focusable: false`: clicks must not take focus from the app whose text is selected.
+pub fn make_no_activate(hwnd: HWND) -> isize {
+    unsafe {
+        let ex = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+        SetWindowLongPtrW(hwnd, GWL_EXSTYLE, ex | WS_EX_NOACTIVATE as isize)
+    }
+}
+
+/// `showInactive()`.
+pub fn show_no_activate(hwnd: HWND) {
+    unsafe {
+        ShowWindow(hwnd, SW_SHOWNOACTIVATE);
+    }
+}
+
+/// Hide a window shown with show_no_activate (tao does not track that visibility).
+pub fn hide(hwnd: HWND) {
+    unsafe {
+        ShowWindow(hwnd, SW_HIDE);
+    }
 }
