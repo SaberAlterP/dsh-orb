@@ -20,58 +20,80 @@
 			if (data.type !== OVERLAY_SESSION_MESSAGE_TYPE || typeof data.sessionId !== "string") return void 0;
 			return { type: OVERLAY_SESSION_MESSAGE_TYPE, sessionId: data.sessionId };
 		}
+		/** Captured at bundle load, before the app may rewrite the URL. */
+		const INITIAL_SEARCH = typeof location === "undefined" ? "" : location.search;
+		/** The floating shell document served by dsh-orb; Compact Chat is its iframe. */
+		function embeddedInFloatingShell() {
+			try {
+				return window.parent !== window && window.parent.location.pathname === "/.dsh/orb/floating.html";
+			} catch {
+				return false;
+			}
+		}
 		function overlayClientSurface(search) {
-			const raw = search ?? (typeof location === "undefined" ? "" : location.search);
+			const raw = search ?? INITIAL_SEARCH;
 			const query = raw.startsWith("?") ? raw.slice(1) : raw;
-			return new URLSearchParams(query).get("surface") === OVERLAY_CLIENT_SURFACE;
+			return new URLSearchParams(query).get("surface") === OVERLAY_CLIENT_SURFACE || search === void 0 && embeddedInFloatingShell();
+		}
+		/** Diagnostics into orb-shell's log through the shell's IPC (same origin). */
+		function shellLog(text) {
+			try {
+				window.parent.ipc?.postMessage(JSON.stringify({ type: "log", level: "overlay", text: String(text), url: location.href }));
+			} catch {}
 		}
 
 		// ── Compact Chat root (verbatim from Orb, CSS included) ──
 		const css = "html,body{height:100%;margin:0;overflow:hidden}html{background:0 0}body{background:var(--dsw-alias-bg-base)}#root{height:100%}.p0qSPW_shell{box-sizing:border-box;--dsh-chat-content-width:100%;--dsh-composer-side-clearance:0px;height:100%;overflow:auto}.p0qSPW_shell [data-chat-turn-rail]{display:none}[data-overlay-chat] .p0qSPW_shell :is(.DYkZvW_toBottomSlot,.DYkZvW_toBottom){display:none}.p0qSPW_inputOverlay{width:0;height:0;overflow:visible}";
+		/**
+		 * Harness 0.2 keeps its layout inside the overlay iframe; reduce it to the transcript the way Orb's Compact
+		 * Chat looked: no sidebars, conversation header, composer (the floating panel has its own input) or width
+		 * handles, and the center column filling the panel. Selectors use the layout's stable data attributes.
+		 */
+		const COMPACT_LAYOUT_CSS = [
+			'[data-slot="root"]>div{display:block!important;height:100%!important;width:100%!important}',
+			'[data-slot="root"]>div>div:has(>[data-slot="sidebar"]),[data-rightbar-col],[data-slot="rightbar"]{display:none!important}',
+			'[data-slot="root"]>div>div:has(>[data-slot="main"]){width:100%!important;height:100%!important;max-width:none!important}',
+			'[data-slot="conversation.header"],[data-composer-seat],[data-width-handle]{display:none!important}',
+			'[data-conversation-content]{--dsh-chat-content-width:100%;--dsh-composer-side-clearance:0px}',
+			'[data-chat-turn-rail]{display:none!important}'
+		].join("");
 		const tagId = "dsh-orb/OverlayChatRoot.module.css";
 		if (overlayClientSurface() && typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId) + "]") === null) {
 			const tag = document.createElement("style");
 			tag.dataset.plugin = "dsh-orb";
 			tag.dataset.pluginCss = tagId;
-			tag.textContent = css;
+			tag.textContent = css + COMPACT_LAYOUT_CSS;
 			document.head.appendChild(tag);
 		}
 		const styles = { inputOverlay: "p0qSPW_inputOverlay", shell: "p0qSPW_shell" };
 		function ignoreView(_view, _focus) {}
 		function ignoreRequest() {}
-		function OverlayChatRoot({ renderSlot, SessionProvider, useSessions }) {
-			const sessionId = useSessions((state) => state.ids.find((id) => (state.byId[id]?.retainedBy.mainView ?? 0) > 0));
+		let renderedOnce = false;
+		/**
+		 * Compact Chat root for Harness 0.2: the same session conversation the main window shows under
+		 * `main` -> `main.conversation`, without the sidebar, right bar and shell chrome (hidden further by CSS).
+		 * The session comes from the shell's `dsh.overlay.session` message (retained as mainView below).
+		 */
+		function OverlayChatRoot(props) {
+			if (!renderedOnce) {
+				renderedOnce = true;
+				shellLog("compact root render; props: " + Object.keys(props ?? {}).join(","));
+			}
 			return (0, react_jsx_runtime.jsx)("div", {
 				className: styles.shell,
 				"data-conversation-scroll": "",
 				"data-overlay-chat": "",
-				children: (0, react_jsx_runtime.jsx)(SessionProvider, {
-					empty: () => null,
-					children: sessionId === void 0 ? null : (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [renderSlot("conversation.view", {
-						inspectCall: void 0,
-						viewRequest: null,
-						openView: ignoreView,
-						completeViewRequest: ignoreRequest
-					}, { only: "chat" }), (0, react_jsx_runtime.jsx)("div", {
-						className: styles.inputOverlay,
-						children: renderSlot("conversation.input.overlay", {})
-					})] })
-				})
+				children: props.renderSlot("main", {}, { entryKey: "conversation" })
 			});
 		}
 
 		const inject = ["slots", "sessions"];
 		function apply(ctx) {
 			if (!overlayClientSurface()) return;
+			shellLog("compact chat active; search=" + INITIAL_SEARCH);
 			// The 0.2 layout always occupies `root`; a lower priority number shadows it (single slots elect the lowest).
-			ctx.effect(() => ctx.slots.register({
-				name: "root",
-				priority: -100,
-				children: {
-					"conversation.view": { kind: "list", scope: "session" },
-					"conversation.input.overlay": { kind: "list", scope: "session" }
-				}
-			}, OverlayChatRoot), "dsh-orb: compact root");
+			// Harness 0.2 forbids re-declaring the layout's child slots, so Compact Chat keeps the layout and
+			// hides its chrome with the overlay stylesheet instead of replacing `root`.
 			ctx.effect(() => {
 				let pending;
 				let held;

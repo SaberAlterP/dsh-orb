@@ -2,11 +2,12 @@
 
 use crate::geometry::Rect;
 use std::ffi::c_void;
-use windows_sys::Win32::Foundation::{BOOL, HWND, LPARAM, POINT, RECT, TRUE};
+use windows_sys::core::BOOL;
+use windows_sys::Win32::Foundation::{HWND, LPARAM, POINT, RECT, TRUE};
 use windows_sys::Win32::Graphics::Gdi::{EnumDisplayMonitors, GetMonitorInfoW, HDC, HMONITOR, MONITORINFO};
 use windows_sys::Win32::UI::Shell::ShellExecuteW;
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    AppendMenuW, CreatePopupMenu, DestroyMenu, GetCursorPos, GetWindowRect, SetForegroundWindow, SetWindowDisplayAffinity,
+    AllowSetForegroundWindow, AppendMenuW, CreatePopupMenu, DestroyMenu, GetCursorPos, GetWindowRect, SetForegroundWindow, SetWindowDisplayAffinity,
     SetWindowPos, TrackPopupMenu, HMENU, HWND_TOPMOST, MF_CHECKED, MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING,
     SWP_NOACTIVATE, SW_SHOWNORMAL, TPM_NONOTIFY, TPM_RETURNCMD, TPM_RIGHTBUTTON, WDA_EXCLUDEFROMCAPTURE, WDA_NONE,
 };
@@ -65,6 +66,8 @@ pub fn cursor() -> (f64, f64) {
 
 /// Open a URL with the shell (used for `dsh://open`, which DeepSeek Harness answers by focusing its main window).
 pub fn open_url(url: &str) {
+    // We hold the foreground (the user just clicked us); let the launched Harness instance take it.
+    unsafe { AllowSetForegroundWindow(u32::MAX) };
     let verb = wide("open");
     let file = wide(url);
     unsafe {

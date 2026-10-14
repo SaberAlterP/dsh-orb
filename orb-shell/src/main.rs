@@ -36,7 +36,29 @@ enum UserEvent {
 /// Bridge from the renderer: window.ipc.postMessage(JSON) and window.__orbBridgeReceive(reply).
 const BRIDGE_PRELUDE: &str = r#"
 window.__ORB_SHELL__ = { native: 'wry' };
+(() => {
+  const log = (level, text) => { try { const ipc = window.ipc || (window.parent && window.parent.ipc); ipc && ipc.postMessage(JSON.stringify({ type: 'log', level, text: String(text).slice(0, 2000), url: location.href })) } catch {} };
+  window.addEventListener('error', (e) => log('error', (e.message || e) + ' @ ' + (e.filename || '') + ':' + (e.lineno || '')));
+  window.addEventListener('unhandledrejection', (e) => log('rejection', e.reason && (e.reason.stack || e.reason.message) || e.reason));
+  if (window.top === window) setInterval(() => { for (const f of document.querySelectorAll('iframe')) { try { const t = f.contentDocument && f.contentDocument.body && f.contentDocument.body.innerText || ''; if (/Failed to load plugins/.test(t) && f.__orbLogged !== t) { f.__orbLogged = t; log('overlay-boot', t) } } catch (e) { } } }, 1000);
+  for (const level of ['error', 'warn']) { const original = console[level]; console[level] = (...args) => { log(level, args.map((a) => a && a.stack || (typeof a === 'object' ? JSON.stringify(a) : a)).join(' ')); original.apply(console, args) } }
+})();
 "#;
+
+/// Append a line to %LOCALAPPDATA%\dsh-orb\orb-shell.log (diagnostics; rotated at 1 MiB).
+fn log_line(text: &str) {
+    let Ok(base) = std::env::var("LOCALAPPDATA") else { return };
+    let dir = std::path::PathBuf::from(base).join("dsh-orb");
+    let _ = std::fs::create_dir_all(&dir);
+    let path = dir.join("orb-shell.log");
+    if std::fs::metadata(&path).map_or(false, |m| m.len() > 1 << 20) {
+        let _ = std::fs::rename(&path, dir.join("orb-shell.log.1"));
+    }
+    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(&path) {
+        let secs = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs());
+        let _ = writeln!(f, "{secs} {text}");
+    }
+}
 
 struct Anim {
     start: Rect,
@@ -324,15 +346,16 @@ fn main() {
 
     let ipc_proxy = proxy.clone();
     let load_proxy = proxy.clone();
-    let webview = WebViewBuilder::with_web_context(&mut web_context)
+    let webview = WebViewBuilder::new_with_web_context(&mut web_context)
         .with_transparent(true)
         .with_background_color((0, 0, 0, 0))
-        .with_initialization_script(BRIDGE_PRELUDE)
+        .with_initialization_script_for_main_only(BRIDGE_PRELUDE, false)
+        .with_initialization_script_for_main_only(if std::env::var("DSH_ORB_DEBUG_NOHIDE").is_ok() { "window.__DSH_ORB_AUTOHIDE__ = { dockAutoHide: false, autoCollapseMs: 3600000 };" } else { "" }, true)
         .with_ipc_handler(move |req| {
             let _ = ipc_proxy.send_event(UserEvent::Ipc(req.body().clone()));
         })
         .with_on_page_load_handler(move |event, url| {
-            if event == PageLoadEvent::Finished {
+            if matches!(event, PageLoadEvent::Finished) {
                 let _ = load_proxy.send_event(UserEvent::PageLoaded(url));
             }
         })
@@ -368,6 +391,7 @@ fn main() {
         match event {
             Event::NewEvents(StartCause::ResumeTimeReached { .. }) => floating.step_anim(),
             Event::UserEvent(UserEvent::PageLoaded(url)) => {
+                log_line(&format!("page loaded {}", url.split('?').next().unwrap_or("")));
                 if url.starts_with(&page_url) {
                     on_page = true;
                     if !shown {
@@ -418,9 +442,14 @@ fn main() {
 
 fn handle_ipc(f: &mut Floating, body: &str, control_flow: &mut ControlFlow) {
     let Ok(msg) = serde_json::from_str::<Value>(body) else { return };
+    if msg["type"].as_str() == Some("log") {
+        log_line(&format!("[js {}] {} ({})", msg["level"].as_str().unwrap_or("?"), msg["text"].as_str().unwrap_or(""), msg["url"].as_str().unwrap_or("")));
+        return;
+    }
     if msg["type"].as_str() != Some("invoke") {
         return;
     }
+    log_line(&format!("invoke {} {}", msg["op"].as_str().unwrap_or("?"), msg["args"]));
     let id = msg["id"].as_u64().unwrap_or(0);
     let args = msg["args"].as_array().cloned().unwrap_or_default();
     let num = |i: usize| args.get(i).and_then(Value::as_f64);
@@ -497,7 +526,7 @@ fn show_observation_frame(frame: &mut Option<Frame>, target: &tao::event_loop::E
         let Ok(window) = window else { return };
         let _ = window.set_ignore_cursor_events(true);
         win::exclude_from_capture(window.hwnd() as HWND, true);
-        let Ok(webview) = WebViewBuilder::with_web_context(ctx).with_transparent(true).with_background_color((0, 0, 0, 0)).with_url(url).build(&window) else { return };
+        let Ok(webview) = WebViewBuilder::new_with_web_context(ctx).with_transparent(true).with_background_color((0, 0, 0, 0)).with_url(url).build(&window) else { return };
         *frame = Some(Frame { window, webview });
     }
     let Some(f) = frame else { return };
