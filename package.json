@@ -21,11 +21,14 @@
     "./host/coordinate-mode": "./lib/host/computer-use-orb-coordinate-mode.js",
     "./host/code-agent-model": "./lib/host/computer-use-orb-code-agent-model.js",
     "./host/prefs": "./lib/host/orb-prefs.js",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./host/shell": "./lib/host/shell.js"
   },
   "files": [
     "lib/**",
     "presets/**",
+    "renderer/**",
+    "orb-shell/orb-shell.exe",
     "cordis.patch.yml",
     "LICENSE",
     "LICENSE.deepseek-computer-use",

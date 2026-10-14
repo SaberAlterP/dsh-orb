@@ -13,6 +13,8 @@
       name: dsh-orb/host/code-agent-model
     - id: orb-prefs
       name: dsh-orb/host/prefs
+    - id: orb-shell
+      name: dsh-orb/host/shell
 
 # The `computer-use` agent preset, verbatim from Orb 0.1.7 resources/computer-use/cordis.patch.yml
 # (persona prompt, tool rows and config unchanged; only the two package names point at this plugin).
