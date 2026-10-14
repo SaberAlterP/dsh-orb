@@ -1,0 +1,64 @@
+{
+  "name": "dsh-orb",
+  "version": "0.1.0",
+  "description": "DeepSeek Orb's Computer Use mode, background code_agent and floating ball for DeepSeek Harness 0.2, as a profile plugin.",
+  "license": "MIT",
+  "type": "module",
+  "main": "lib/index.js",
+  "os": [
+    "win32"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "exports": {
+    ".": "./lib/index.js",
+    "./computer-use": "./lib/computer-use/index.js",
+    "./code-agent": "./lib/computer-use/code-agent.js",
+    "./preset-root": "./lib/computer-use/preset-root.js",
+    "./host/overlay-guard": "./lib/host/computer-use-overlay-guard.js",
+    "./host/permission": "./lib/host/computer-use-orb-permission.js",
+    "./host/coordinate-mode": "./lib/host/computer-use-orb-coordinate-mode.js",
+    "./host/code-agent-model": "./lib/host/computer-use-orb-code-agent-model.js",
+    "./host/prefs": "./lib/host/orb-prefs.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/**",
+    "presets/**",
+    "cordis.patch.yml",
+    "LICENSE",
+    "LICENSE.deepseek-computer-use",
+    "README.md"
+  ],
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "computer-use",
+    "orb"
+  ],
+  "engines": {
+    "node": "^22.19 || >=24"
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.4",
+    "@deepseek-ai/dsh": "^0.2.0-rc.2"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/cordis": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh": {
+      "optional": true
+    }
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}
