@@ -3,6 +3,8 @@
 # Host rows (formerly mounted by Orb's Desktop Host): overlay guard, Orb permission / coordinate mode /
 # code_agent model services, and the bridge that reads Orb's stored preferences from the profile.
 - insert:
+    - id: orb-client
+      name: dsh-orb
     - id: orb-overlay-guard
       name: dsh-orb/host/overlay-guard
     - id: orb-permission

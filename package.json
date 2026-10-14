@@ -22,7 +22,8 @@
     "./host/code-agent-model": "./lib/host/computer-use-orb-code-agent-model.js",
     "./host/prefs": "./lib/host/orb-prefs.js",
     "./package.json": "./package.json",
-    "./host/shell": "./lib/host/shell.js"
+    "./host/shell": "./lib/host/shell.js",
+    "./client": "./lib/client.js"
   },
   "files": [
     "lib/**",
@@ -62,6 +63,15 @@
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-renderer",
+        "@deepseek-ai/dsh-client-ui-session",
+        "@deepseek-ai/dsh-client-ui-slots"
+      ]
     }
   }
 }
