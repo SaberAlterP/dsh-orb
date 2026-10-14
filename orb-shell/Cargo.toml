@@ -1,0 +1,30 @@
+[package]
+name = "orb-shell"
+version = "0.1.0"
+edition = "2021"
+description = "Native companion for dsh-orb: Orb's floating ball, selection toolbar and observation frame on DeepSeek Harness 0.2"
+license = "MIT"
+publish = false
+
+[dependencies]
+tao = "0.34"
+wry = "0.53"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+windows-sys = { version = "0.60", features = [
+  "Win32_Foundation",
+  "Win32_Graphics_Gdi",
+  "Win32_UI_WindowsAndMessaging",
+  "Win32_UI_HiDpi",
+  "Win32_UI_Shell",
+  "Win32_UI_Input_KeyboardAndMouse",
+  "Win32_System_Threading",
+  "Win32_System_LibraryLoader",
+] }
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"

@@ -1,0 +1,953 @@
+// Orb settings page, ported from @deepseek-ai/dsh-client-ui-settings-orb 0.1.7-rc.1 (MIT, DeepSeek). Factory body.
+		var module = { exports: {} };
+		var exports = module.exports;
+		Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
+		let react_jsx_runtime = require("react/jsx-runtime");
+		let react = require("react");
+		let _deepseek_ai_dsh_client_ui_primitives = require("@deepseek-ai/dsh-client-ui-primitives");
+		let _deepseek_ai_dsh_client_store = require("@deepseek-ai/dsh-client-store");
+		//#region \0dsh-css:C:\projects\deepseek_harness\packages\client\ui-settings-orb\src\client\OrbSettingsSection.module.css.mjs
+		const css = ".Z7Waca_section{max-width:720px;color:var(--dsw-alias-label-primary);flex-direction:column;gap:12px;display:flex}.Z7Waca_title{margin:0;font-size:18px;font-weight:600}.Z7Waca_intro{color:var(--dsw-alias-label-tertiary);margin:0;font-size:13px}.Z7Waca_banner{background:var(--dsw-alias-bg-module-platform);color:var(--dsw-alias-label-secondary);border-radius:10px;margin:0;padding:10px 12px;font-size:13px;line-height:1.5}.Z7Waca_error{color:var(--dsw-alias-label-error);margin:0;font-size:13px}.Z7Waca_fields{border:0;flex-direction:column;gap:12px;min-width:0;margin:0;padding:0;display:flex}.Z7Waca_card{border:.5px solid var(--dsw-alias-border-l4);background:var(--dsw-alias-bg-module-platform);border-radius:14px;flex-direction:column;gap:8px;padding:14px 16px;display:flex}.Z7Waca_cardTitle{margin:0;font-size:14px;font-weight:600;line-height:1.5}.Z7Waca_cardDescription{color:var(--dsw-alias-label-tertiary);margin:0;font-size:12px;line-height:1.5}.Z7Waca_avatarRow{align-items:center;gap:16px;display:flex}.Z7Waca_avatar{object-fit:cover;background:var(--dsw-alias-bg-layer-3);border-radius:50%;flex:none;width:72px;height:72px}.Z7Waca_avatarActions{flex-wrap:wrap;gap:8px;display:flex}.Z7Waca_trigger{background:var(--dsw-alias-bg-layer-3);max-width:min(280px,100%);height:36px;font:inherit;color:var(--dsw-alias-label-primary);cursor:pointer;border:none;border-radius:18px;align-items:center;gap:8px;padding:0 14px;font-size:14px;line-height:22px;display:inline-flex}.Z7Waca_trigger:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover)}.Z7Waca_trigger:disabled{cursor:default;opacity:.5}.Z7Waca_triggerLabel{text-overflow:ellipsis;white-space:nowrap;overflow:hidden}.Z7Waca_triggerEffort{color:var(--dsw-alias-label-tertiary);flex:none;font-size:12px;line-height:18px}.Z7Waca_chevron{flex:none}.Z7Waca_empty{color:var(--dsw-alias-label-tertiary);margin:0;font-size:13px}.Z7Waca_toggleRow{justify-content:space-between;align-items:center;gap:20px;display:flex}.Z7Waca_toggleCopy{gap:4px;min-width:0;display:grid}.Z7Waca_tccRow{justify-content:space-between;align-items:flex-start;gap:16px;display:flex}.Z7Waca_tccName{margin:0;font-size:13px;font-weight:600;line-height:1.5}.Z7Waca_tccStatus{color:var(--dsw-alias-label-secondary);margin:0;font-size:12px;line-height:1.5}";
+		const tagId = "@deepseek-ai/dsh-client-ui-settings-orb/OrbSettingsSection.module.css";
+		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId) + "]") === null) {
+			const tag = document.createElement("style");
+			tag.dataset.plugin = "@deepseek-ai/dsh-client-ui-settings-orb";
+			tag.dataset.pluginCss = tagId;
+			tag.textContent = css;
+			document.head.appendChild(tag);
+		}
+		var OrbSettingsSection_module_css_default = {
+			"avatar": "Z7Waca_avatar",
+			"avatarActions": "Z7Waca_avatarActions",
+			"avatarRow": "Z7Waca_avatarRow",
+			"banner": "Z7Waca_banner",
+			"card": "Z7Waca_card",
+			"cardDescription": "Z7Waca_cardDescription",
+			"cardTitle": "Z7Waca_cardTitle",
+			"chevron": "Z7Waca_chevron",
+			"empty": "Z7Waca_empty",
+			"error": "Z7Waca_error",
+			"fields": "Z7Waca_fields",
+			"intro": "Z7Waca_intro",
+			"section": "Z7Waca_section",
+			"tccName": "Z7Waca_tccName",
+			"tccRow": "Z7Waca_tccRow",
+			"tccStatus": "Z7Waca_tccStatus",
+			"title": "Z7Waca_title",
+			"toggleCopy": "Z7Waca_toggleCopy",
+			"toggleRow": "Z7Waca_toggleRow",
+			"trigger": "Z7Waca_trigger",
+			"triggerEffort": "Z7Waca_triggerEffort",
+			"triggerLabel": "Z7Waca_triggerLabel"
+		};
+		//#endregion
+		//#region lib/types/client/OrbModelPicker.js
+		/** Compact model picker: a pill trigger and a portaled Menu with effort submenus. */
+		/**
+		* Render a dropdown of catalog models; thinking models expose an effort submenu.
+		* @param props - catalog, current selection, and the persist callback.
+		* @returns the trigger, or the empty-catalog line.
+		*/
+		function OrbModelPicker(props) {
+			const groups = props.catalog?.groups ?? [];
+			const [open, setOpen] = (0, react.useState)(false);
+			(0, react.useEffect)(() => {
+				if (props.disabled) setOpen(false);
+			}, [props.disabled]);
+			if (groups.length === 0) return (0, react_jsx_runtime.jsx)("p", {
+				className: OrbSettingsSection_module_css_default.empty,
+				children: props.emptyLabel
+			});
+			const currentModel = findCatalogModel(groups, props.current);
+			const modelLabel = currentModel?.name ?? props.current.model;
+			const effortLabel = currentEffortLabel(currentModel, props.current, props.defaultEffortLabel);
+			return (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Menu, {
+				open,
+				onClose: () => {
+					setOpen(false);
+				},
+				items: catalogMenuItems(groups, props.current, props.defaultEffortLabel),
+				selectedId: modelRowId(props.current.provider, props.current.model),
+				onSelect: (id) => {
+					setOpen(false);
+					props.onSelect(parseMenuPick(id));
+				},
+				align: "end",
+				portal: true,
+				anchor: (0, react_jsx_runtime.jsxs)("button", {
+					type: "button",
+					className: OrbSettingsSection_module_css_default.trigger,
+					"aria-label": props.label,
+					"aria-haspopup": "menu",
+					"aria-expanded": open,
+					disabled: props.disabled,
+					onClick: () => {
+						setOpen((value) => !value);
+					},
+					children: [
+						(0, react_jsx_runtime.jsx)("span", {
+							className: OrbSettingsSection_module_css_default.triggerLabel,
+							children: modelLabel
+						}),
+						effortLabel === void 0 ? null : (0, react_jsx_runtime.jsx)("span", {
+							className: OrbSettingsSection_module_css_default.triggerEffort,
+							children: effortLabel
+						}),
+						(0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconChevronDownOutlineRegular, { className: OrbSettingsSection_module_css_default.chevron })
+					]
+				})
+			});
+		}
+		function findCatalogModel(groups, current) {
+			for (const group of groups) {
+				if (group.id !== current.provider) continue;
+				const model = group.models.find((entry) => entry.id === current.model);
+				if (model !== void 0) return model;
+			}
+		}
+		function currentEffortLabel(model, current, defaultEffortLabel) {
+			const reasoning = model?.reasoning;
+			if (reasoning === void 0) return void 0;
+			const effective = current.reasoningEffort ?? reasoning.defaultEffort;
+			if (effective === void 0) return defaultEffortLabel;
+			return reasoning.efforts.find((effort) => effort.id === effective)?.name ?? effective;
+		}
+		function catalogMenuItems(groups, current, defaultEffortLabel) {
+			const items = [];
+			for (const group of groups) {
+				items.push({
+					type: "label",
+					id: `group:${group.id}`,
+					text: group.name
+				});
+				for (const model of group.models) items.push(modelMenuItem(group.id, model, current, defaultEffortLabel));
+			}
+			return items;
+		}
+		function modelMenuItem(provider, model, current, defaultEffortLabel) {
+			const selected = current.provider === provider && current.model === model.id;
+			const efforts = model.reasoning?.efforts ?? [];
+			if (efforts.length === 0) return {
+				id: modelRowId(provider, model.id),
+				label: model.name
+			};
+			const submenu = [...model.reasoning?.defaultEffort === void 0 ? [{
+				id: effortRowId(provider, model.id, void 0),
+				label: defaultEffortLabel,
+				...selected && current.reasoningEffort === void 0 ? { icon: (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconCheckOutlineRegular, {}) } : {}
+			}] : [], ...efforts.map((effort) => {
+				const effective = current.reasoningEffort ?? model.reasoning?.defaultEffort;
+				return {
+					id: effortRowId(provider, model.id, effort.id),
+					label: effort.name,
+					...selected && effective === effort.id ? { icon: (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconCheckOutlineRegular, {}) } : {}
+				};
+			})];
+			return {
+				id: modelRowId(provider, model.id),
+				label: model.name,
+				submenu
+			};
+		}
+		function modelRowId(provider, model) {
+			return `model\t${provider}\t${model}`;
+		}
+		function effortRowId(provider, model, effort) {
+			return `effort\t${provider}\t${model}\t${effort ?? ""}`;
+		}
+		function parseMenuPick(id) {
+			const [, provider = "", model = "", effort] = id.split("	");
+			return effort === void 0 || effort === "" ? {
+				provider,
+				model
+			} : {
+				provider,
+				model,
+				reasoningEffort: effort
+			};
+		}
+		//#endregion
+		//#region lib/types/client/OrbSettingsSection.js
+		/**
+		* Desktop floating-ball Settings section: avatar, overlay and background
+		* Agent models, the selection toolbar, millifraction coordinates, and macOS
+		* Screen Recording / Accessibility status. Writes apply immediately except
+		* millifraction, which confirms then creates a new chat.
+		*/
+		/**
+		* Render the floating-ball Settings page.
+		* @param props - locale copy, the page snapshot, and persist actions.
+		* @returns the section column.
+		*/
+		function OrbSettingsSection(props) {
+			const { useOrbSettings, t, load } = props;
+			const state = useOrbSettings((snapshot) => snapshot);
+			(0, react.useEffect)(() => {
+				load();
+			}, [load]);
+			if (state.status === "unavailable") return (0, react_jsx_runtime.jsx)("div", {
+				className: OrbSettingsSection_module_css_default.section,
+				children: (0, react_jsx_runtime.jsx)("p", {
+					className: OrbSettingsSection_module_css_default.error,
+					role: "alert",
+					children: t("unavailable")
+				})
+			});
+			if (state.status === "error") {
+				const detail = state.error ?? "";
+				return (0, react_jsx_runtime.jsxs)("div", {
+					className: OrbSettingsSection_module_css_default.section,
+					children: [(0, react_jsx_runtime.jsx)("p", {
+						className: OrbSettingsSection_module_css_default.error,
+						role: "alert",
+						children: `${t("error")} ${detail}`
+					}), (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+						variant: "outline",
+						size: "sm",
+						onClick: () => {
+							load();
+						},
+						children: t("retry")
+					})]
+				});
+			}
+			const disabled = !state.supported || state.busy || state.status !== "ready";
+			const avatarMessage = state.avatarError === "too-large" ? t("tooLarge") : state.avatarError === "invalid-type" ? t("invalidType") : null;
+			return (0, react_jsx_runtime.jsxs)("div", {
+				className: OrbSettingsSection_module_css_default.section,
+				children: [
+					(0, react_jsx_runtime.jsx)("h2", {
+						className: OrbSettingsSection_module_css_default.title,
+						children: t("nav")
+					}),
+					(0, react_jsx_runtime.jsx)("p", {
+						className: OrbSettingsSection_module_css_default.intro,
+						children: t("sectionIntro")
+					}),
+					!state.supported && state.status === "ready" ? (0, react_jsx_runtime.jsx)("p", {
+						className: OrbSettingsSection_module_css_default.banner,
+						role: "status",
+						children: t("macosOnly")
+					}) : null,
+					(0, react_jsx_runtime.jsxs)("fieldset", {
+						className: OrbSettingsSection_module_css_default.fields,
+						disabled,
+						children: [
+							(0, react_jsx_runtime.jsxs)("section", {
+								className: OrbSettingsSection_module_css_default.card,
+								children: [
+									(0, react_jsx_runtime.jsx)("h3", {
+										className: OrbSettingsSection_module_css_default.cardTitle,
+										children: t("avatarTitle")
+									}),
+									(0, react_jsx_runtime.jsx)("p", {
+										className: OrbSettingsSection_module_css_default.cardDescription,
+										children: t("avatarDescription")
+									}),
+									(0, react_jsx_runtime.jsxs)("div", {
+										className: OrbSettingsSection_module_css_default.avatarRow,
+										children: [state.avatarUrl === "" ? (0, react_jsx_runtime.jsx)("div", {
+											className: OrbSettingsSection_module_css_default.avatar,
+											"aria-hidden": "true"
+										}) : (0, react_jsx_runtime.jsx)("img", {
+											className: OrbSettingsSection_module_css_default.avatar,
+											src: state.avatarUrl,
+											alt: t("avatarAlt")
+										}), (0, react_jsx_runtime.jsxs)("div", {
+											className: OrbSettingsSection_module_css_default.avatarActions,
+											children: [(0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+												variant: "outline",
+												size: "sm",
+												disabled,
+												onClick: () => {
+													props.pickAvatar();
+												},
+												children: t("chooseImage")
+											}), (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+												variant: "ghost",
+												size: "sm",
+												disabled,
+												onClick: () => {
+													props.restoreAvatar();
+												},
+												children: t("restoreDefault")
+											})]
+										})]
+									}),
+									avatarMessage === null ? null : (0, react_jsx_runtime.jsx)("p", {
+										className: OrbSettingsSection_module_css_default.error,
+										role: "alert",
+										children: avatarMessage
+									})
+								]
+							}),
+							(0, react_jsx_runtime.jsx)("section", {
+								className: OrbSettingsSection_module_css_default.card,
+								children: (0, react_jsx_runtime.jsxs)("div", {
+									className: OrbSettingsSection_module_css_default.toggleRow,
+									children: [(0, react_jsx_runtime.jsxs)("div", {
+										className: OrbSettingsSection_module_css_default.toggleCopy,
+										children: [(0, react_jsx_runtime.jsx)("h3", {
+											className: OrbSettingsSection_module_css_default.cardTitle,
+											children: t("overlayTitle")
+										}), (0, react_jsx_runtime.jsx)("p", {
+											className: OrbSettingsSection_module_css_default.cardDescription,
+											children: t("overlayDescription")
+										})]
+									}), (0, react_jsx_runtime.jsx)(OrbModelPicker, {
+										label: t("overlayTitle"),
+										catalog: state.catalog,
+										current: state.overlay,
+										disabled,
+										emptyLabel: t("emptyCatalog"),
+										defaultEffortLabel: t("defaultEffort"),
+										onSelect: (selection) => {
+											props.setOverlayModel(selection);
+										}
+									})]
+								})
+							}),
+							(0, react_jsx_runtime.jsx)("section", {
+								className: OrbSettingsSection_module_css_default.card,
+								children: (0, react_jsx_runtime.jsxs)("div", {
+									className: OrbSettingsSection_module_css_default.toggleRow,
+									children: [(0, react_jsx_runtime.jsxs)("div", {
+										className: OrbSettingsSection_module_css_default.toggleCopy,
+										children: [(0, react_jsx_runtime.jsx)("h3", {
+											className: OrbSettingsSection_module_css_default.cardTitle,
+											children: t("backgroundTitle")
+										}), (0, react_jsx_runtime.jsx)("p", {
+											className: OrbSettingsSection_module_css_default.cardDescription,
+											children: t("backgroundDescription")
+										})]
+									}), (0, react_jsx_runtime.jsx)(OrbModelPicker, {
+										label: t("backgroundTitle"),
+										catalog: state.catalog,
+										current: state.background,
+										disabled,
+										emptyLabel: t("emptyCatalog"),
+										defaultEffortLabel: t("defaultEffort"),
+										onSelect: (selection) => {
+											props.setBackgroundModel(selection);
+										}
+									})]
+								})
+							}),
+							(0, react_jsx_runtime.jsx)("section", {
+								className: OrbSettingsSection_module_css_default.card,
+								children: (0, react_jsx_runtime.jsxs)("div", {
+									className: OrbSettingsSection_module_css_default.toggleRow,
+									children: [(0, react_jsx_runtime.jsxs)("div", {
+										className: OrbSettingsSection_module_css_default.toggleCopy,
+										children: [(0, react_jsx_runtime.jsx)("h3", {
+											className: OrbSettingsSection_module_css_default.cardTitle,
+											children: t("selectionTitle")
+										}), (0, react_jsx_runtime.jsx)("p", {
+											className: OrbSettingsSection_module_css_default.cardDescription,
+											children: t("selectionDescription")
+										})]
+									}), (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Switch, {
+										checked: state.selectionEnabled,
+										label: t("selectionToggle"),
+										disabled,
+										onChange: (enabled) => {
+											props.setSelectionEnabled(enabled);
+										}
+									})]
+								})
+							}),
+							(0, react_jsx_runtime.jsx)("section", {
+								className: OrbSettingsSection_module_css_default.card,
+								children: (0, react_jsx_runtime.jsxs)("div", {
+									className: OrbSettingsSection_module_css_default.toggleRow,
+									children: [(0, react_jsx_runtime.jsxs)("div", {
+										className: OrbSettingsSection_module_css_default.toggleCopy,
+										children: [(0, react_jsx_runtime.jsx)("h3", {
+											className: OrbSettingsSection_module_css_default.cardTitle,
+											children: t("millifractionTitle")
+										}), (0, react_jsx_runtime.jsx)("p", {
+											className: OrbSettingsSection_module_css_default.cardDescription,
+											children: t("millifractionDescription")
+										})]
+									}), (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Switch, {
+										checked: state.millifractionEnabled,
+										label: t("millifractionToggle"),
+										disabled,
+										onChange: (enabled) => {
+											props.setMillifractionEnabled(enabled);
+										}
+									})]
+								})
+							}),
+							state.supported ? (0, react_jsx_runtime.jsxs)("section", {
+								className: OrbSettingsSection_module_css_default.card,
+								children: [
+									(0, react_jsx_runtime.jsx)("h3", {
+										className: OrbSettingsSection_module_css_default.cardTitle,
+										children: t("tccTitle")
+									}),
+									(0, react_jsx_runtime.jsx)("p", {
+										className: OrbSettingsSection_module_css_default.cardDescription,
+										children: t("tccDescription")
+									}),
+									(0, react_jsx_runtime.jsx)("p", {
+										className: OrbSettingsSection_module_css_default.cardDescription,
+										children: t("tccAppHint").replaceAll("{name}", state.tcc.appName)
+									}),
+									(0, react_jsx_runtime.jsxs)("div", {
+										className: OrbSettingsSection_module_css_default.tccRow,
+										children: [(0, react_jsx_runtime.jsxs)("div", {
+											className: OrbSettingsSection_module_css_default.toggleCopy,
+											children: [
+												(0, react_jsx_runtime.jsx)("h4", {
+													className: OrbSettingsSection_module_css_default.tccName,
+													children: t("tccScreenName")
+												}),
+												(0, react_jsx_runtime.jsx)("p", {
+													className: OrbSettingsSection_module_css_default.cardDescription,
+													children: t("tccScreenReason")
+												}),
+												(0, react_jsx_runtime.jsx)("p", {
+													className: OrbSettingsSection_module_css_default.cardDescription,
+													children: t("tccScreenPath")
+												}),
+												(0, react_jsx_runtime.jsx)("p", {
+													className: OrbSettingsSection_module_css_default.tccStatus,
+													children: tccStatusCopy(t, state.tcc.screen)
+												})
+											]
+										}), (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+											variant: "outline",
+											size: "sm",
+											disabled: disabled || state.tcc.screen === "granted",
+											onClick: () => {
+												props.openTcc("screen");
+											},
+											children: t("tccScreenOpen")
+										})]
+									}),
+									(0, react_jsx_runtime.jsxs)("div", {
+										className: OrbSettingsSection_module_css_default.tccRow,
+										children: [(0, react_jsx_runtime.jsxs)("div", {
+											className: OrbSettingsSection_module_css_default.toggleCopy,
+											children: [
+												(0, react_jsx_runtime.jsx)("h4", {
+													className: OrbSettingsSection_module_css_default.tccName,
+													children: t("tccAccessibilityName")
+												}),
+												(0, react_jsx_runtime.jsx)("p", {
+													className: OrbSettingsSection_module_css_default.cardDescription,
+													children: t("tccAccessibilityReason")
+												}),
+												(0, react_jsx_runtime.jsx)("p", {
+													className: OrbSettingsSection_module_css_default.cardDescription,
+													children: t("tccAccessibilityPath")
+												}),
+												(0, react_jsx_runtime.jsx)("p", {
+													className: OrbSettingsSection_module_css_default.tccStatus,
+													children: tccStatusCopy(t, state.tcc.accessibility)
+												})
+											]
+										}), (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+											variant: "outline",
+											size: "sm",
+											disabled: disabled || state.tcc.accessibility === "granted",
+											onClick: () => {
+												props.openTcc("accessibility");
+											},
+											children: t("tccAccessibilityOpen")
+										})]
+									}),
+									(0, react_jsx_runtime.jsx)("p", {
+										className: OrbSettingsSection_module_css_default.cardDescription,
+										children: t("tccFooter").replaceAll("{name}", state.tcc.appName)
+									})
+								]
+							}) : null
+						]
+					})
+				]
+			});
+		}
+		function tccStatusCopy(t, state) {
+			if (state === "granted") return t("tccStatusGranted");
+			if (state === "needsRelaunch") return t("tccStatusNeedsRelaunch");
+			return t("tccStatusMissing");
+		}
+		//#endregion
+		//#region lib/types/client/desktop-api.js
+		/** Narrow Desktop app-document bridge duplicated from apps/desktop (this package cannot import that app). */
+		/**
+		* Read the Desktop app-document bridge when this document is `dsh-app://app`.
+		* @returns the typed API, or undefined in `dsh web` and on the startup page.
+		*/
+		// dsh-orb: Harness 0.2 has no Orb preload in the main window; the same operations go to the plugin's
+		// cookie-protected Host routes (the main window forwards /.dsh/orb/* to the Host with its cookie).
+		function readDesktopAppApi() {
+			const call = async (op, ...args) => {
+				const response = await fetch("/.dsh/orb/api/" + op, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(args) });
+				const value = await response.json();
+				if (!response.ok) throw new Error(value?.error ?? "HTTP " + response.status);
+				return value;
+			};
+			const pickFile = () => new Promise((resolve) => {
+				const input = document.createElement("input");
+				input.type = "file";
+				input.accept = "image/gif,image/png,image/webp,.gif,.png,.webp";
+				input.addEventListener("change", () => resolve(input.files?.[0]), { once: true });
+				input.addEventListener("cancel", () => resolve(void 0), { once: true });
+				input.click();
+			});
+			return { protocolVersion: 1, orb: {
+				supported: () => call("orbSupported"),
+				snapshot: () => call("orbSnapshot"),
+				pickAvatar: async () => {
+					const file = await pickFile();
+					if (file === void 0) return { ok: false, error: "cancelled" };
+					if (file.size > 2097152) return { ok: false, error: "too-large" };
+					const bytes = new Uint8Array(await file.arrayBuffer());
+					let binary = "";
+					for (let i = 0; i < bytes.length; i += 32768) binary += String.fromCharCode(...bytes.subarray(i, i + 32768));
+					return call("avatarUpload", file.name, btoa(binary));
+				},
+				restoreAvatar: () => call("avatarRestore"),
+				setOverlayModel: (selection) => call("overlayModelSet", selection),
+				setBackgroundModel: (selection) => call("backgroundModelSet", selection),
+				setSelectionEnabled: (enabled) => call("selectionEnabledSet", enabled),
+				setMillifractionEnabled: async (enabled) => {
+					await call("millifractionSet", enabled);
+					return { cancelled: false, snapshot: await call("orbSnapshot") };
+				},
+				openTcc: () => call("orbSnapshot")
+			} };
+		}
+		//#endregion
+		//#region lib/types/client/section-store.js
+		/**
+		* Floating-ball Settings controller: Desktop profile preferences plus the
+		* Host model catalog. Writes go through `window.dshDesktop` immediately;
+		* the catalog is Host RPC and never stored in Host settings.yaml.
+		*/
+		const IDLE = {
+			status: "idle",
+			error: null,
+			supported: false,
+			avatarUrl: "",
+			avatarError: null,
+			overlay: {
+				provider: "",
+				model: ""
+			},
+			background: {
+				provider: "",
+				model: ""
+			},
+			selectionEnabled: true,
+			millifractionEnabled: true,
+			tcc: {
+				applicable: false,
+				appName: "",
+				screen: "granted",
+				accessibility: "granted"
+			},
+			catalog: void 0,
+			busy: false
+		};
+		const errorMessage = (error) => error instanceof Error ? error.message : String(error);
+		/** Loads Desktop orb preferences and the Host model catalog. */
+		var OrbSettingsController = class {
+			ctx;
+			/** Page snapshot the renderer subscribes to. */
+			store = (0, _deepseek_ai_dsh_client_store.createSnapshotStore)(IDLE);
+			/**
+			* @param ctx - browser plugin context; `remote.session` supplies the catalog.
+			*/
+			constructor(ctx) {
+				this.ctx = ctx;
+			}
+			/**
+			* Read the Desktop snapshot and Host catalog.
+			* @returns after the page snapshot is published.
+			*/
+			async load() {
+				const api = readDesktopAppApi();
+				if (api === void 0) {
+					this.store.set({
+						...IDLE,
+						status: "unavailable"
+					});
+					return;
+				}
+				this.store.set({
+					...this.store.getSnapshot(),
+					status: "loading",
+					error: null
+				});
+				try {
+					const [snapshot, catalog] = await Promise.all([api.orb.snapshot(), this.readCatalog()]);
+					this.publishSnapshot(snapshot, catalog, null);
+				} catch (error) {
+					this.store.set({
+						...this.store.getSnapshot(),
+						status: "error",
+						error: errorMessage(error),
+						busy: false
+					});
+				}
+			}
+			/**
+			* Open the native picker and persist a custom ball image.
+			* @returns after the snapshot reflects the pick, a cancellation, or a rejected file.
+			*/
+			async pickAvatar() {
+				const api = this.requireApi();
+				if (api === void 0) return;
+				this.store.set({
+					...this.store.getSnapshot(),
+					busy: true,
+					avatarError: null
+				});
+				try {
+					const result = await api.orb.pickAvatar();
+					if (!result.ok) {
+						this.store.set({
+							...this.store.getSnapshot(),
+							busy: false,
+							avatarError: result.error === "cancelled" ? null : result.error
+						});
+						return;
+					}
+					this.applySnapshot(result.snapshot);
+				} catch (error) {
+					this.store.set({
+						...this.store.getSnapshot(),
+						status: "error",
+						error: errorMessage(error),
+						busy: false
+					});
+				}
+			}
+			/**
+			* Restore the packaged ball GIF.
+			* @returns after the snapshot reflects the packaged image.
+			*/
+			async restoreAvatar() {
+				const api = this.requireApi();
+				if (api === void 0) return;
+				this.store.set({
+					...this.store.getSnapshot(),
+					busy: true,
+					avatarError: null
+				});
+				try {
+					this.applySnapshot(await api.orb.restoreAvatar());
+				} catch (error) {
+					this.store.set({
+						...this.store.getSnapshot(),
+						status: "error",
+						error: errorMessage(error),
+						busy: false
+					});
+				}
+			}
+			/**
+			* Persist the overlay Computer Use selection.
+			* @param selection - provider, model, and optional reasoning effort.
+			* @returns after Desktop writes the profile JSON.
+			*/
+			async setOverlayModel(selection) {
+				await this.writeModel("overlay", selection);
+			}
+			/**
+			* Persist the background `code_agent` selection.
+			* @param selection - provider, model, and optional reasoning effort.
+			* @returns after Desktop writes the profile JSON.
+			*/
+			async setBackgroundModel(selection) {
+				await this.writeModel("background", selection);
+			}
+			/**
+			* Persist selection-toolbar enablement and start or stop the helper.
+			* @param enabled - whether the toolbar should read selections.
+			* @returns after Desktop writes the profile JSON.
+			*/
+			async setSelectionEnabled(enabled) {
+				const api = this.requireApi();
+				if (api === void 0) return;
+				this.store.set({
+					...this.store.getSnapshot(),
+					selectionEnabled: enabled,
+					busy: true
+				});
+				try {
+					await api.orb.setSelectionEnabled(enabled);
+					this.store.set({
+						...this.store.getSnapshot(),
+						busy: false
+					});
+				} catch (error) {
+					this.store.set({
+						...this.store.getSnapshot(),
+						status: "error",
+						error: errorMessage(error),
+						busy: false
+					});
+				}
+			}
+			/**
+			* Persist millifraction-coordinates enablement only after native confirm.
+			* Does not set busy or flip the switch until Electron returns a non-cancelled snapshot.
+			* @param enabled - whether new overlay chats should use 0–1000 millifraction.
+			* @returns after Desktop confirms or cancels.
+			*/
+			async setMillifractionEnabled(enabled) {
+				const api = this.requireApi();
+				if (api === void 0) return;
+				try {
+					const result = await api.orb.setMillifractionEnabled(enabled);
+					if (result.cancelled) return;
+					this.store.set({
+						...this.store.getSnapshot(),
+						millifractionEnabled: result.snapshot.millifractionEnabled
+					});
+				} catch (error) {
+					this.store.set({
+						...this.store.getSnapshot(),
+						status: "error",
+						error: errorMessage(error),
+						busy: false
+					});
+				}
+			}
+			/**
+			* Open Screen Recording or Accessibility in System Settings and refresh status.
+			* @param right - the TCC pane to open.
+			* @returns after Desktop writes the snapshot.
+			*/
+			async openTcc(right) {
+				const api = this.requireApi();
+				if (api === void 0) return;
+				this.store.set({
+					...this.store.getSnapshot(),
+					busy: true
+				});
+				try {
+					this.applySnapshot(await api.orb.openTcc(right));
+				} catch (error) {
+					this.store.set({
+						...this.store.getSnapshot(),
+						status: "error",
+						error: errorMessage(error),
+						busy: false
+					});
+				}
+			}
+			requireApi() {
+				const api = readDesktopAppApi();
+				if (api === void 0) this.store.set({
+					...this.store.getSnapshot(),
+					status: "unavailable"
+				});
+				return api;
+			}
+			applySnapshot(snapshot) {
+				const current = this.store.getSnapshot();
+				this.store.set({
+					...current,
+					status: "ready",
+					error: null,
+					busy: false,
+					avatarError: null,
+					supported: snapshot.supported,
+					avatarUrl: snapshot.avatarUrl,
+					overlay: snapshot.overlay,
+					background: snapshot.background,
+					selectionEnabled: snapshot.selectionEnabled,
+					millifractionEnabled: snapshot.millifractionEnabled,
+					tcc: snapshot.tcc
+				});
+			}
+			publishSnapshot(snapshot, catalog, error) {
+				this.store.set({
+					status: "ready",
+					error,
+					supported: snapshot.supported,
+					avatarUrl: snapshot.avatarUrl,
+					avatarError: null,
+					overlay: snapshot.overlay,
+					background: snapshot.background,
+					selectionEnabled: snapshot.selectionEnabled,
+					millifractionEnabled: snapshot.millifractionEnabled,
+					tcc: snapshot.tcc,
+					catalog,
+					busy: false
+				});
+			}
+			async writeModel(side, selection) {
+				const api = this.requireApi();
+				if (api === void 0) return;
+				this.store.set({
+					...this.store.getSnapshot(),
+					[side]: selection,
+					busy: true
+				});
+				try {
+					if (side === "overlay") await api.orb.setOverlayModel(selection);
+					else await api.orb.setBackgroundModel(selection);
+					this.store.set({
+						...this.store.getSnapshot(),
+						busy: false
+					});
+				} catch (error) {
+					this.store.set({
+						...this.store.getSnapshot(),
+						status: "error",
+						error: errorMessage(error),
+						busy: false
+					});
+				}
+			}
+			async readCatalog() {
+				const response = await this.ctx.remote.session.modelCatalog();
+				if (!response.ok) return void 0;
+				return { groups: response.value.groups };
+			}
+		};
+		//#endregion
+		//#region lib/types/client/locales.js
+		/** Locale bundles for the Desktop floating-ball Settings page. */
+		/** Simplified Chinese dictionary (the key-set source of truth). */
+		const zh = {
+			nav: "悬浮球",
+			sectionIntro: "更改立即作用于 macOS 悬浮球。头像支持 GIF、PNG 或 WebP，建议不超过 2 MB。",
+			macosOnly: "悬浮球仅 macOS 可用。",
+			unavailable: "当前窗口无法读取桌面悬浮球设置。",
+			error: "无法加载悬浮球设置。",
+			retry: "重试",
+			avatarTitle: "悬浮球头像",
+			avatarDescription: "选择一张 GIF、PNG 或 WebP 图片。恢复默认会重新使用自带头像。",
+			avatarAlt: "悬浮球头像预览",
+			chooseImage: "选择图片",
+			restoreDefault: "恢复默认",
+			tooLarge: "图片超过 2 MB。",
+			invalidType: "请选择 GIF、PNG 或 WebP 图片。",
+			overlayTitle: "悬浮球 Agent",
+			overlayDescription: "悬浮球 Computer Use 会话使用的模型与思考强度。",
+			backgroundTitle: "后台 Agent",
+			backgroundDescription: "新建后台 code_agent 会话使用的模型与思考强度。",
+			emptyCatalog: "暂无可用模型。",
+			defaultEffort: "默认",
+			selectionTitle: "划词工具栏",
+			selectionDescription: "在其他应用中划选文字后显示搜索、翻译和发给 Agent。",
+			selectionToggle: "启用划词工具栏",
+			millifractionTitle: "千分比坐标",
+			millifractionDescription: "新建 overlay 对话使用截图的 0–1000 比例。关闭后使用已附加图片的像素。更改此项会新建对话。",
+			millifractionToggle: "使用千分比坐标",
+			tccTitle: "Mac 权限",
+			tccDescription: "Computer Use 需要屏幕录制与辅助功能。点按钮打开系统设置对应页。",
+			tccAppHint: "在列表里打开 {name}。",
+			tccScreenName: "屏幕录制",
+			tccScreenReason: "让 agent 看见当前窗口。",
+			tccScreenPath: "系统设置 → 隐私与安全性 → 屏幕录制",
+			tccScreenOpen: "打开「屏幕录制」设置",
+			tccAccessibilityName: "辅助功能",
+			tccAccessibilityReason: "让 agent 点击和输入。",
+			tccAccessibilityPath: "系统设置 → 隐私与安全性 → 辅助功能",
+			tccAccessibilityOpen: "打开「辅助功能」设置",
+			tccStatusMissing: "未开启",
+			tccStatusGranted: "已开启",
+			tccStatusNeedsRelaunch: "已开启，请退出后重开",
+			tccFooter: "打开开关后必须完全退出 {name} 再打开。只关主窗口无效。"
+		};
+		/** English dictionary, checked complete against the zh key set. */
+		const en = {
+			nav: "Floating ball",
+			sectionIntro: "Changes apply immediately to the macOS floating ball. The avatar accepts GIF, PNG, or WebP, with a suggested 2 MB cap.",
+			macosOnly: "The floating ball is available only on macOS.",
+			unavailable: "This window cannot read Desktop floating-ball settings.",
+			error: "Could not load floating-ball settings.",
+			retry: "Retry",
+			avatarTitle: "Ball image",
+			avatarDescription: "Choose a GIF, PNG, or WebP image. Restore default reuses the shipped avatar.",
+			avatarAlt: "Floating-ball image preview",
+			chooseImage: "Choose image",
+			restoreDefault: "Restore default",
+			tooLarge: "The image is larger than 2 MB.",
+			invalidType: "Choose a GIF, PNG, or WebP image.",
+			overlayTitle: "Floating-ball Agent",
+			overlayDescription: "Model and reasoning effort for the ball's Computer Use session.",
+			backgroundTitle: "Background Agent",
+			backgroundDescription: "Model and reasoning effort for new background code_agent sessions.",
+			emptyCatalog: "No models available.",
+			defaultEffort: "Default",
+			selectionTitle: "Selection toolbar",
+			selectionDescription: "After a drag-select in another app, offer Search, Translate, and Send to Agent.",
+			selectionToggle: "Enable the selection toolbar",
+			millifractionTitle: "Millifraction coordinates",
+			millifractionDescription: "New overlay chats use 0–1000 fractions of the screenshot. Turn off to use pixels of the attached image. Changing this creates a new conversation.",
+			millifractionToggle: "Use millifraction coordinates",
+			tccTitle: "Mac permissions",
+			tccDescription: "Computer Use needs Screen Recording and Accessibility. Each button opens that System Settings pane.",
+			tccAppHint: "In the list, turn on {name}.",
+			tccScreenName: "Screen Recording",
+			tccScreenReason: "Lets the agent see the current window.",
+			tccScreenPath: "System Settings → Privacy & Security → Screen Recording",
+			tccScreenOpen: "Open Screen Recording settings",
+			tccAccessibilityName: "Accessibility",
+			tccAccessibilityReason: "Lets the agent click and type.",
+			tccAccessibilityPath: "System Settings → Privacy & Security → Accessibility",
+			tccAccessibilityOpen: "Open Accessibility settings",
+			tccStatusMissing: "Off",
+			tccStatusGranted: "On",
+			tccStatusNeedsRelaunch: "On — quit and reopen",
+			tccFooter: "After you turn the switches on, quit {name} fully, then open it again. Closing the main window does not quit."
+		};
+		//#endregion
+		//#region lib/types/client/index.js
+		/**
+		* Floating-ball Settings page, browser half — one `settings.section` that
+		* reads Desktop profile preferences through `window.dshDesktop` and the Host
+		* model catalog through `session/modelCatalog`. The plugin is inserted only
+		* by the Desktop Host overlay, so `dsh web` never shows the nav row.
+		*/
+		/** Required services (cordis fiber inject). */
+		const inject = [
+			"slots",
+			"locale",
+			"remote",
+			"remote.session"
+		];
+		/**
+		* Register the floating-ball Settings section.
+		* @param ctx - the browser plugin context.
+		*/
+		function apply(ctx) {
+			const controller = new OrbSettingsController(ctx);
+			ctx.effect(() => ctx.locale.register("settings.orb", {
+				zh,
+				en
+			}), "ui-settings-orb: dictionaries");
+			const sectionInjected = () => ({
+				hooks: { orbSettings: controller.store },
+				load: () => controller.load(),
+				pickAvatar: () => controller.pickAvatar(),
+				restoreAvatar: () => controller.restoreAvatar(),
+				setOverlayModel: (selection) => controller.setOverlayModel(selection),
+				setBackgroundModel: (selection) => controller.setBackgroundModel(selection),
+				setSelectionEnabled: (enabled) => controller.setSelectionEnabled(enabled),
+				setMillifractionEnabled: (enabled) => controller.setMillifractionEnabled(enabled),
+				openTcc: (right) => controller.openTcc(right)
+			});
+			ctx.slots.inject("settings.section", () => ctx.slots.register({
+				name: "settings.section",
+				id: "orb",
+				order: 25,
+				label: () => ctx.locale.bind("settings.orb")("nav"),
+				locale: "settings.orb",
+				inject: sectionInjected
+			}, OrbSettingsSection));
+		}
+		//#endregion
+		exports.apply = apply;
+		exports.inject = inject;
+		return module.exports;
